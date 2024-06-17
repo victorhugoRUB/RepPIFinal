@@ -139,5 +139,5 @@ app.get('/index', isAuthenticated, (req, res) => {
 });
 
 app.listen(porta, host, () => {
-    console.log(`Servidor está executando em http://${host}:${porta}`);
+    console.log(`Servidor está executando em http://${host}:${porta}/index`);
 });
