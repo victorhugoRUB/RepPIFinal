@@ -9,10 +9,10 @@ const porta = 3000;
 
 const app = express();
 
-var listaInt = [];
-var listaAnimais = [];
-var listaAdocao = [];
-const validUsers = [{ email: "teste@exemplo.com", senha: "123456" }];
+const validUsers = [
+    { nome: "ADM", email: "teste@exemplo.com", senha: "123456" },
+    { nome: "Victor", email: "victor@exemplo.com", senha: "123456"}
+];
 
 app.use(express.static(path.join(process.cwd(), 'public')));
 app.use(bodyParser.json());
@@ -44,6 +44,7 @@ app.post('/login', (req, res) => {
 
     if (user) {
         req.session.user = email;
+        req.session.nome = user.nome;
         const lastAccess = new Date().toString();
         res.cookie('lastAccess', lastAccess, { maxAge: 30 * 60 * 1000, httpOnly: false });
         res.status(200).json({ success: true, lastAccess });
@@ -60,68 +61,8 @@ app.post('/registrar', (req, res) => {
         return res.status(400).json({ success: false, message: "Email já registrado" });
     }
 
-    validUsers.push({ email, senha });
+    validUsers.push({nome, email, senha });
     res.status(200).json({ success: true });
-});
-
-app.post('/cadastrarInt', isAuthenticated, (req, res) => {
-    const { nome, sobrenome, email, dataNascimento, cidade, estado, cep } = req.body;
-
-    listaInt.push({
-        nome: nome,
-        sobrenome: sobrenome,
-        email: email,
-        dataNascimento: dataNascimento,
-        cidade: cidade,
-        estado: estado,
-        cep: cep
-    });
-
-    res.json(listaInt);
-});
-
-app.get('/listarInt', isAuthenticated, (req, res) => {
-    res.json(listaInt);
-});
-
-app.post('/cadastrarAnimal', isAuthenticated, (req, res) => {
-    const { nome, idade, raca } = req.body;
-
-    listaAnimais.push({
-        nome: nome,
-        idade: idade,
-        raca: raca
-    });
-
-    res.json(listaAnimais);
-});
-
-app.get('/listarAnimais', isAuthenticated, (req, res) => {
-    res.json(listaAnimais);
-});
-
-app.get('/adotarPet', isAuthenticated, (req, res) => {
-    res.sendFile(path.join(process.cwd(), 'public', 'adotarPet.html'));
-});
-
-app.get('/dadosAdocao', isAuthenticated, (req, res) => {
-    res.json({
-        interessados: listaInt,
-        pets: listaAnimais
-    });
-});
-
-app.post('/registrarAdocao', isAuthenticated, (req, res) => {
-    const { interessado, pet } = req.body;
-    const data = new Date().toString();
-
-    listaAdocao.push({
-        interessado: interessado,
-        pet: pet,
-        data: data
-    });
-
-    res.json({ success: true });
 });
 
 app.get('/logout', (req, res) => {
@@ -136,6 +77,60 @@ app.get('/logout', (req, res) => {
 
 app.get('/index', isAuthenticated, (req, res) => {
     res.sendFile(path.join(process.cwd(), 'public', 'index.html'));
+});
+
+app.get('/listarUsuarios', isAuthenticated, (req, res) => {
+    const currentUserEmail = req.session.user;
+    const nomes = validUsers
+        .filter(user => user.email !== currentUserEmail)
+        .map(user => user.nome);
+    res.json(nomes);
+});
+
+app.get('/chat', isAuthenticated, (req, res) => {
+    const user = req.query.user;
+    res.sendFile(path.join(process.cwd(), 'public', 'chat.html'));
+});
+
+const messages = {};
+
+app.post('/sendMessage', isAuthenticated, (req, res) => {
+    const { to, content } = req.body;
+    // const from = req.session.user;
+    const from = req.session.nome;
+    
+    if (!messages[from]) {
+        messages[from] = {};
+    }
+    if (!messages[to]) {
+        messages[to] = {};
+    }
+    
+    if (!messages[from][to]) {
+        messages[from][to] = [];
+    }
+    if (!messages[to][from]) {
+        messages[to][from] = [];
+    }
+    
+    const message = { from, to, content, timestamp: new Date() };
+    messages[from][to].push(message);
+    messages[to][from].push(message);
+    
+    res.status(200).json({ success: true });
+});
+
+app.get('/getMessages', isAuthenticated, (req, res) => {
+    const { withUser } = req.query;
+    const user = req.session.user;
+    const nome = req.session.nome;
+    console.log(messages[nome])
+
+    if (messages[nome] && messages[nome][withUser]) {
+        res.status(200).json(messages[nome][withUser]);
+    } else {
+        res.status(200).json([]);
+    }
 });
 
 app.listen(porta, host, () => {
